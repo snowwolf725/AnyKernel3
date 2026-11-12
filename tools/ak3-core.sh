@@ -22,6 +22,25 @@ ui_print() {
   done;
 }
 
+grep_cmdline() {
+  local REGEX="s/^$1=//p"
+  { echo $(cat /proc/cmdline)$(sed -e 's/[^"]//g' -e 's/""//g' /proc/cmdline) | xargs -n 1; \
+    sed -e 's/ = /=/g' -e 's/, /,/g' -e 's/"//g' /proc/bootconfig; \
+  } 2>/dev/null | sed -n "$REGEX"
+}
+
+get_slot(){
+   # Check A/B slot
+  SLOT=`grep_cmdline androidboot.slot_suffix`
+  if [ -z $SLOT ]; then
+    SLOT=`grep_cmdline androidboot.slot`
+    [ -z $SLOT ] || SLOT=_${SLOT}
+  fi
+  [ "$SLOT" = "normal" ] && unset SLOT
+  [ -z $SLOT ] || 
+  echo $SLOT
+}
+
 # abort ["<text>" [...]]
 abort() {
   ui_print " " "$@";
@@ -942,11 +961,37 @@ setup_ak() {
 }
 ###
 
+check_bin_ak() {
+     # AnyKernel 專用：檢查 tools 目錄內二進制
+     local binpath="$bin/$1"
+     if [ ! -f "$binpath" ] || [ ! -x "$binpath" ]; then
+         ui_print "Missing binary in tools: $1"
+         abort "Missing required binary: $1"
+     fi
+ }
+ 
 # patch kernelsu
 patch_kernelsu() {
- cd $home;
- $bin/ksud boot-patch -b $bootimg -m $home/kernelsu.ko --magiskboot $bin/magiskboot
-  mv 
+     check_bin_ak ksud
+     if [ ! -f "$bootimg" ]; then
+         abort "bootimg not found: $bootimg"
+     fi
+     if [ ! -f "$home/kernelsu.ko" ]; then
+         abort "kernelsu.ko not found!"
+     fi
+     local ksud_log="/tmp/ksud_patch.log"
+     ui_print "Running ksud boot-patch..."
+     
+     cd $home;
+     $bin/ksud" boot-patch -b "$bootimg" -m "$home/kernelsu.ko" &> "$ksud_log"
+     local ret=$?
+     # 失敗就把 log 印出來然後中止
+     if [ $ret -ne 0 ]; then
+         ui_print "ksud patch failed, log:"
+         while read -r line; do ui_print " | $line"; done < "$ksud_log"
+         abort "KernelSU patch failed (ksud exit $ret)"
+     fi
+
  if [ -f $home/kernelsu_patched*.img ]; then
     mv $home/kernelsu_patched*.img $home/boot-new.img
   else
