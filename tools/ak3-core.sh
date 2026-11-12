@@ -851,6 +851,7 @@ setup_ak() {
           ;;
         esac;
       fi;
+      slot=$(get_slot)
       if [ ! "$slot" -a "$is_slot_device" == 1 ]; then
         abort "Unable to determine active slot. Aborting...";
       fi;
@@ -983,7 +984,7 @@ patch_kernelsu() {
      ui_print "Running ksud boot-patch..."
      
      cd $home;
-     $bin/ksud" boot-patch -b "$bootimg" -m "$home/kernelsu.ko" &> "$ksud_log"
+     "$bin/ksud" boot-patch -b "$bootimg" -m "$home/kernelsu.ko" -o .  &> "$ksud_log"
      local ret=$?
      # 失敗就把 log 印出來然後中止
      if [ $ret -ne 0 ]; then
